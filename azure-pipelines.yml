@@ -1,19 +1,34 @@
-# Starter pipeline
-# Start with a minimal pipeline that you can customize to build and deploy your code.
-# Add steps that build, run tests, deploy, and more:
-# https://aka.ms/yaml
+name: $(Build.SourceBranchName)_$(Build.Reason)_$(majorVersion).$(Build.BuildId)$(Rev:.r)
+variables:
+  buildConfiguration: 'Release'
+  majorVersion: 0.0.0
 
+# Enable PR validation on branches master and dev
+pr:
+  branches:
+    include:
+    - master
+    - dev
+
+# Enable CI on branches master and dev
+# Batch builds
 trigger:
-- master
+  batch: true
+  branches:
+    include:
+    - dev
+    - master
 
-pool:
-  vmImage: 'ubuntu-latest'
+jobs:
 
-steps:
-- script: echo Hello, world!
-  displayName: 'Run a one-line script'
-
-- script: |
-    echo Add other tasks to build, test, and deploy your project.
-    echo See https://aka.ms/yaml
-  displayName: 'Run a multi-line script'
+- job: build_and_test
+  displayName: 'Build and Test'
+  continueOnError: false
+  pool:
+    vmImage: 'Ubuntu 16.04'
+  
+  steps:
+  - task: DotNetCoreCLI@2
+    displayName: 'Build project'
+    inputs:
+      projects: .

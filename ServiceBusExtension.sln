@@ -5,7 +5,7 @@ VisualStudioVersion = 15.0.27130.2024
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{639967B0-0544-4C52-94AC-9A3D25E33256}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebJobs.Host.EndToEndTests", "test\Microsoft.Azure.WebJobs.Host.EndToEndTests\WebJobs.Host.EndToEndTests.csproj", "{340AB554-5482-4B3D-B65F-46DFF5AF1684}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebJobs.Extensions.ServiceBus.E2ETests", "test\Microsoft.Azure.WebJobs.Extensions.ServiceBus.E2ETests\WebJobs.Extensions.ServiceBus.E2ETests.csproj", "{340AB554-5482-4B3D-B65F-46DFF5AF1684}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebJobs.Extensions.ServiceBus", "src\Microsoft.Azure.WebJobs.Extensions.ServiceBus\WebJobs.Extensions.ServiceBus.csproj", "{A2B3C676-3DF0-43B4-92A2-7E7DAA7BF439}"
 EndProject

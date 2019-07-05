@@ -5,8 +5,8 @@
     <AssemblyName>Microsoft.Azure.WebJobs.ServiceBus</AssemblyName>
     <RootNamespace>Microsoft.Azure.WebJobs.ServiceBus</RootNamespace>
     <PackageId>Microsoft.Azure.WebJobs.Extensions.ServiceBus</PackageId>
-    <Description>Provides extension to work with Service Bus from Azure Functions.</Description>
-    <Version>4.0.0$(VersionSuffix)</Version>
+    <Description>Microsoft Azure WebJobs SDK ServiceBus Extension</Description>
+    <Version>3.0.6$(VersionSuffix)</Version>
     <CommitHash Condition="$(CommitHash) == ''">N/A</CommitHash>
     <InformationalVersion>$(Version) Commit hash: $(CommitHash)</InformationalVersion>
     <Authors>Microsoft</Authors>

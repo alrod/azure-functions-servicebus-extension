@@ -147,7 +147,7 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
 
             await host.StartAsync();
 
-            _eventHandle1.WaitOne(SBTimeout);
+            Assert.True(_eventHandle1.WaitOne(SBTimeout));
 
             // ensure all logs have had a chance to flush
             await Task.Delay(3000);
@@ -186,18 +186,17 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
                }, nameResolver: _nameResolver)
                .Build();
 
-            //await WriteQueueMessage(_primaryConnectionString, FirstQueueName, "{'Name': 'Test1', 'Value': 'Value'}");
-            //await WriteQueueMessage(_primaryConnectionString, FirstQueueName, "{'Name': 'Test2', 'Value': 'Value'}");
+            await WriteQueueMessage(_primaryConnectionString, FirstQueueName, "{'Name': 'Test1', 'Value': 'Value'}");
+            await WriteQueueMessage(_primaryConnectionString, FirstQueueName, "{'Name': 'Test2', 'Value': 'Value'}");
 
-            await WriteQueueMessage(_primaryConnectionString, FirstQueueName, new DummyClass() { Name = "Test1" });
-            await WriteQueueMessage(_primaryConnectionString, FirstQueueName, new DummyClass() { Name = "Test2" });
+            //await WriteQueueMessage(_primaryConnectionString, FirstQueueName, new DummyClass() { Name = "Test1" });
+            //await WriteQueueMessage(_primaryConnectionString, FirstQueueName, new DummyClass() { Name = "Test2" });
 
             _eventHandle1 = new ManualResetEvent(initialState: false);
 
             await host.StartAsync();
 
-            bool result = _eventHandle1.WaitOne(SBTimeout);
-            Assert.True(result);
+            Assert.True(_eventHandle1.WaitOne(SBTimeout));
 
             // ensure all logs have had a chance to flush
             await Task.Delay(3000);
@@ -271,8 +270,8 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
             {
                 await host.StartAsync();
 
-                _eventHandle1.WaitOne(SBTimeout);
-                _eventHandle2.WaitOne(SBTimeout);
+                Assert.True(_eventHandle1.WaitOne(SBTimeout));
+                Assert.True(_eventHandle2.WaitOne(SBTimeout));
 
                 // ensure all logs have had a chance to flush
                 await Task.Delay(4000);

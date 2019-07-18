@@ -27,6 +27,15 @@ namespace Microsoft.Azure.WebJobs.ServiceBus
             {
                 MaxConcurrentCalls = 16
             };
+
+            SessionHandlerOptions = new SessionHandlerOptions(ExceptionReceivedHandler);
+
+            BatchOptions = new BatchOptions()
+            {
+                MaxMessageCount = 100,
+                OperationTimeout = TimeSpan.FromSeconds(5),
+                DelayBetweenOperations = TimeSpan.FromSeconds(2)
+            };
         }
 
         /// <summary>
@@ -39,6 +48,19 @@ namespace Microsoft.Azure.WebJobs.ServiceBus
         /// <see cref="MessageReceiver"/>s.
         /// </summary>
         public MessageHandlerOptions MessageHandlerOptions { get; set; }
+
+        /// <summary>
+        /// Gets or sets the default <see cref="Azure.ServiceBus.SessionHandlerOptions"/> that will be used by
+        /// <see cref="ClientEntity"/>s.
+        /// </summary>
+        public SessionHandlerOptions SessionHandlerOptions { get; set; }
+
+
+        /// <summary>
+        /// Gets or sets the default <see cref="Azure.ServiceBus.BatchOptions"/> that will be used by
+        /// <see cref="ClientEntity"/>s.
+        /// </summary>
+        public BatchOptions BatchOptions { get; set; }
 
         /// <summary>
         /// Gets or sets the default PrefetchCount that will be used by <see cref="MessageReceiver"/>s.
@@ -60,11 +82,37 @@ namespace Microsoft.Azure.WebJobs.ServiceBus
                 };
             }
 
+            JObject sessionHandlerOptions = null;
+            if (SessionHandlerOptions != null)
+            {
+                sessionHandlerOptions = new JObject
+                {
+                    { nameof(SessionHandlerOptions.AutoComplete), SessionHandlerOptions.AutoComplete },
+                    { nameof(SessionHandlerOptions.MaxAutoRenewDuration), SessionHandlerOptions.MaxAutoRenewDuration },
+                    { nameof(SessionHandlerOptions.MaxConcurrentSessions), SessionHandlerOptions.MaxConcurrentSessions },
+                    { nameof(SessionHandlerOptions.MessageWaitTimeout), SessionHandlerOptions.MessageWaitTimeout }
+                };
+            }
+
+            JObject batchOptions = null;
+            if (BatchOptions != null)
+            {
+                batchOptions = new JObject
+                {
+                    { nameof(BatchOptions.DelayBetweenOperations), BatchOptions.DelayBetweenOperations },
+                    { nameof(BatchOptions.MaxMessageCount), BatchOptions.MaxMessageCount },
+                    { nameof(BatchOptions.OperationTimeout), BatchOptions.OperationTimeout },
+                };
+            }
+
+
             // Do not include ConnectionString in loggable options.
             JObject options = new JObject
             {
                 { nameof(PrefetchCount), PrefetchCount },
-                { nameof(MessageHandlerOptions), messageHandlerOptions }
+                { nameof(MessageHandlerOptions), messageHandlerOptions },
+                { nameof(SessionHandlerOptions), sessionHandlerOptions },
+                { nameof(BatchOptions), batchOptions}
             };
 
             return options.ToString(Formatting.Indented);

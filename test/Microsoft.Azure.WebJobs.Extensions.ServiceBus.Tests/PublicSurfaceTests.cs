@@ -15,8 +15,8 @@ namespace Microsoft.Azure.WebJobs.Host.UnitTests
 
             var expected = new[]
             {
+                "BatchOptions",
                 "Constants",
-                "EntityType",
                 "MessageProcessor",
                 "MessagingProvider",
                 "ServiceBusAccountAttribute",
@@ -24,7 +24,8 @@ namespace Microsoft.Azure.WebJobs.Host.UnitTests
                 "ServiceBusTriggerAttribute",
                 "ServiceBusHostBuilderExtensions",
                 "ServiceBusOptions",
-                "ServiceBusWebJobsStartup"
+                "ServiceBusWebJobsStartup",
+                "SessionMessageProcessor"
             };
 
             TestHelpers.AssertPublicTypes(expected, assembly);

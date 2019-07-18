@@ -7,33 +7,30 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Azure.ServiceBus;
 using Microsoft.Azure.WebJobs.Host;
-using Microsoft.Azure.WebJobs.Host.Converters;
+using Microsoft.Azure.WebJobs.Host.Bindings;
+using Microsoft.Azure.WebJobs.Host.Listeners;
+using Microsoft.Azure.WebJobs.Host.Protocols;
 using Microsoft.Azure.WebJobs.Host.Triggers;
+using Microsoft.Azure.WebJobs.ServiceBus.Listeners;
 using Microsoft.Extensions.Configuration;
 
 namespace Microsoft.Azure.WebJobs.ServiceBus.Triggers
 {
     internal class ServiceBusTriggerAttributeBindingProvider : ITriggerBindingProvider
     {
-        private static readonly IQueueTriggerArgumentBindingProvider InnerProvider =
-            new CompositeArgumentBindingProvider(
-                new ConverterArgumentBindingProvider<Message>(
-                    new AsyncConverter<Message, Message>(new IdentityConverter<Message>())),
-                new ConverterArgumentBindingProvider<string>(new MessageToStringConverter()),
-                new ConverterArgumentBindingProvider<byte[]>(new MessageToByteArrayConverter()),
-                new UserTypeArgumentBindingProvider()); // Must come last, because it will attempt to bind all types.
-
         private readonly INameResolver _nameResolver;
         private readonly ServiceBusOptions _options;
         private readonly MessagingProvider _messagingProvider;
         private readonly IConfiguration _configuration;
+        private readonly IConverterManager _converterManager;
 
-        public ServiceBusTriggerAttributeBindingProvider(INameResolver nameResolver, ServiceBusOptions options, MessagingProvider messagingProvider, IConfiguration configuration)
+        public ServiceBusTriggerAttributeBindingProvider(INameResolver nameResolver, ServiceBusOptions options, MessagingProvider messagingProvider, IConfiguration configuration, IConverterManager converterManager)
         {
             _nameResolver = nameResolver ?? throw new ArgumentNullException(nameof(nameResolver));
             _options = options ?? throw new ArgumentNullException(nameof(options));
             _messagingProvider = messagingProvider ?? throw new ArgumentNullException(nameof(messagingProvider));
             _configuration = configuration;
+            _converterManager = converterManager;
         }
 
         public Task<ITriggerBinding> TryCreateAsync(TriggerBindingProviderContext context)
@@ -51,41 +48,42 @@ namespace Microsoft.Azure.WebJobs.ServiceBus.Triggers
                 return Task.FromResult<ITriggerBinding>(null);
             }
 
-            string queueName = null;
-            string topicName = null;
-            string subscriptionName = null;
             string entityPath = null;
-
-            if (attribute.QueueName != null)
+            if (!string.IsNullOrEmpty(attribute.QueueName))
             {
-                queueName = Resolve(attribute.QueueName);
-                entityPath = queueName;
+                entityPath = Resolve(attribute.QueueName);
             }
-            else
+            else if (!string.IsNullOrEmpty(attribute.TopicName) && !string.IsNullOrEmpty(attribute.SubscriptionName))
             {
-                topicName = Resolve(attribute.TopicName);
-                subscriptionName = Resolve(attribute.SubscriptionName);
-                entityPath = EntityNameHelper.FormatSubscriptionPath(topicName, subscriptionName);
-            }
-
-            ITriggerDataArgumentBinding<Message> argumentBinding = InnerProvider.TryCreate(parameter);
-            if (argumentBinding == null)
-            {
-                throw new InvalidOperationException(string.Format(CultureInfo.CurrentCulture, "Can't bind ServiceBusTrigger to type '{0}'.", parameter.ParameterType));
+                entityPath = EntityNameHelper.FormatSubscriptionPath(attribute.TopicName, attribute.SubscriptionName);
             }
 
             attribute.Connection = Resolve(attribute.Connection);
-            ServiceBusAccount account = new ServiceBusAccount(_options, _configuration, attribute);
+            ServiceBusAccount account = new ServiceBusAccount(_options, _configuration, entityPath, attribute, attribute.IsSessionsEnabled);
 
-            ITriggerBinding binding;
-            if (queueName != null)
+            Func<ListenerFactoryContext, bool, Task<IListener>> createListener =
+            (factoryContext, singleDispatch) =>
             {
-                binding = new ServiceBusTriggerBinding(parameter.Name, parameter.ParameterType, argumentBinding, account, _options, _messagingProvider, queueName);
-            }
-            else
+                IListener listener = new ServiceBusListener(factoryContext.Executor, _options, account, _messagingProvider, singleDispatch);
+                return Task.FromResult(listener);
+            };
+
+            ParameterDisplayHints hints = new ParameterDisplayHints
             {
-                binding = new ServiceBusTriggerBinding(parameter.Name, parameter.ParameterType, argumentBinding, account, _options, _messagingProvider, topicName, subscriptionName);
-            }
+                Description = string.Format(CultureInfo.CurrentCulture, "dequeue from '{0}'", entityPath),
+                Prompt = "Enter the queue message body",
+                DefaultValue = null
+            };
+
+            ServiceBusTriggerParameterDescriptor parameterDescriptor = new ServiceBusTriggerParameterDescriptor
+            {
+                Name = parameter.Name,
+                EntityPath = entityPath,
+                DisplayHints = hints
+            };
+
+            //ITriggerBinding binding = BindingFactory.GetTriggerBinding(new ServiceBusTriggerBindingStrategy(), parameter, _converterManager, createListener, parameterDescriptor);
+            ITriggerBinding binding = BindingFactory.GetTriggerBinding(new ServiceBusTriggerBindingStrategy(), parameter, _converterManager, createListener);
 
             return Task.FromResult<ITriggerBinding>(binding);
         }

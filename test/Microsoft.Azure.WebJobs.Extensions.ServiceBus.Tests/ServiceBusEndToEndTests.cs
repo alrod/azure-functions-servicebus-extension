@@ -11,6 +11,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.ServiceBus;
 using Microsoft.Azure.ServiceBus.Core;
+using Microsoft.Azure.ServiceBus.InteropExtensions;
 using Microsoft.Azure.WebJobs.Host.TestCommon;
 using Microsoft.Azure.WebJobs.ServiceBus;
 using Microsoft.Extensions.Configuration;
@@ -25,6 +26,12 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
     public class ServiceBusEndToEndTests : IDisposable
     {
         private const string SecondaryConnectionStringKey = "ServiceBusSecondary";
+
+        private const string ServiceBusQueue1EntityPath = "ServiceBusQueue1EntityPath";
+        private const string ServiceBusQueue2EntityPath = "ServiceBusQueue2EntityPath";
+        private const string ServiceBusTopic1TriggerEntityPath = "ServiceBusTopic1TriggerEntityPath";
+        private const string ServiceBusTopic1OutputEntityPath = "ServiceBusTopic1OutputEntityPath";
+
         private const string Prefix = "core-test-";
         private const string FirstQueueName = Prefix + "queue1";
         private const string SecondQueueName = Prefix + "queue2";
@@ -38,8 +45,8 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
 
         private const int SBTimeout = 60 * 1000;
 
-        private static EventWaitHandle _topicSubscriptionCalled1;
-        private static EventWaitHandle _topicSubscriptionCalled2;
+        private static EventWaitHandle _eventHandle1;
+        private static EventWaitHandle _eventHandle2;
 
         // These two variables will be checked at the end of the test
         private static string _resultMessage1;
@@ -54,10 +61,10 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
             var config = new ConfigurationBuilder()
                 .AddEnvironmentVariables()
                 .AddTestSettings()
-                .Build();
+                .Build();        
 
-            _primaryConnectionString = config.GetConnectionString(ServiceBus.Constants.DefaultConnectionStringName);
-            _secondaryConnectionString = config.GetConnectionString(SecondaryConnectionStringKey);
+            _primaryConnectionString = config.GetConnectionStringOrSetting(ServiceBus.Constants.DefaultConnectionStringName);
+            _secondaryConnectionString = config.GetConnectionStringOrSetting(SecondaryConnectionStringKey);
 
             _nameResolver = new RandomNameResolver();
 
@@ -67,14 +74,20 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
         [Fact]
         public async Task ServiceBusEndToEnd()
         {
-            await ServiceBusEndToEndInternal();
+            await ServiceBusEndToEndInternal<ServiceBusTestJobs>();
+        }
+
+        [Fact]
+        public async Task ServiceBusEndToEndEntityPath()
+        {
+            await ServiceBusEndToEndInternal<ServiceBusTestJobsEntityPath>();
         }
 
         [Fact]
         public async Task ServiceBusBinderTest()
         {
             var hostType = typeof(ServiceBusTestJobs);
-            var host = CreateHost();
+            var host = CreateHost<ServiceBusTestJobs>();
             var method = typeof(ServiceBusTestJobs).GetMethod("ServiceBusBinderTest");
 
             int numMessages = 10;
@@ -105,7 +118,7 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
 
             var loggerProvider = host.GetTestLoggerProvider();
 
-            await ServiceBusEndToEndInternal(host: host);
+            await ServiceBusEndToEndInternal<ServiceBusTestJobs>(host: host);
 
             // in addition to verifying that our custom processor was called, we're also
             // verifying here that extensions can log
@@ -130,11 +143,11 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
 
             await WriteQueueMessage(_secondaryConnectionString, FirstQueueName, "Test");
 
-            _topicSubscriptionCalled1 = new ManualResetEvent(initialState: false);
+            _eventHandle1 = new ManualResetEvent(initialState: false);
 
             await host.StartAsync();
 
-            _topicSubscriptionCalled1.WaitOne(SBTimeout);
+            _eventHandle1.WaitOne(SBTimeout);
 
             // ensure all logs have had a chance to flush
             await Task.Delay(3000);
@@ -144,6 +157,54 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
             host.Dispose();
 
             Assert.Equal("Test-topic-1", _resultMessage1);
+        }
+
+        [Fact]
+        public async Task TestBatch_String()
+        {
+            await TestMultiple<ServiceBusMultipleMessagesTestJobs1>();
+        }
+
+        [Fact]
+        public async Task TestBatch_Messages()
+        {
+             await TestMultiple<ServiceBusMultipleMessagesTestJobs2>();
+        }
+
+        [Fact]
+        public async Task TestBatch_JsonPoco()
+        {
+            await TestMultiple<ServiceBusMultipleMessagesTestJobs3>();
+        }
+
+        private async Task TestMultiple<T>()
+        {
+            IHost host = new HostBuilder()
+               .ConfigureDefaultTestHost<T>(b =>
+               {
+                   b.AddServiceBus();
+               }, nameResolver: _nameResolver)
+               .Build();
+
+            //await WriteQueueMessage(_primaryConnectionString, FirstQueueName, "{'Name': 'Test1', 'Value': 'Value'}");
+            //await WriteQueueMessage(_primaryConnectionString, FirstQueueName, "{'Name': 'Test2', 'Value': 'Value'}");
+
+            await WriteQueueMessage(_primaryConnectionString, FirstQueueName, new DummyClass() { Name = "Test1" });
+            await WriteQueueMessage(_primaryConnectionString, FirstQueueName, new DummyClass() { Name = "Test2" });
+
+            _eventHandle1 = new ManualResetEvent(initialState: false);
+
+            await host.StartAsync();
+
+            bool result = _eventHandle1.WaitOne(SBTimeout);
+            Assert.True(result);
+
+            // ensure all logs have had a chance to flush
+            await Task.Delay(3000);
+
+            // Wait for the host to terminate
+            await host.StopAsync();
+            host.Dispose();
         }
 
         private async Task<int> CleanUpEntity(string queueName, string connectionString = null)
@@ -178,10 +239,10 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
             await CleanUpEntity(EntityNameHelper.FormatSubscriptionPath(TopicName, TopicSubscriptionName2));
         }
 
-        private IHost CreateHost()
+        private IHost CreateHost<T>()
         {
             return new HostBuilder()
-                .ConfigureDefaultTestHost<ServiceBusTestJobs>(b =>
+                .ConfigureDefaultTestHost<T>(b =>
                 {
                     b.AddServiceBus();
                 })
@@ -192,26 +253,26 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
                 .Build();
         }
 
-        private async Task ServiceBusEndToEndInternal(IHost host = null)
+        private async Task ServiceBusEndToEndInternal<T>(IHost host = null)
         {
             if (host == null)
             {
-                host = CreateHost();
+                host = CreateHost<T>();
             }
 
-            var jobContainerType = typeof(ServiceBusTestJobs);
+            var jobContainerType = typeof(T);
 
             await WriteQueueMessage(_primaryConnectionString, FirstQueueName, "E2E");
 
-            _topicSubscriptionCalled1 = new ManualResetEvent(initialState: false);
-            _topicSubscriptionCalled2 = new ManualResetEvent(initialState: false);
+            _eventHandle1 = new ManualResetEvent(initialState: false);
+            _eventHandle2 = new ManualResetEvent(initialState: false);
 
             using (host)
             {
                 await host.StartAsync();
 
-                _topicSubscriptionCalled1.WaitOne(SBTimeout);
-                _topicSubscriptionCalled2.WaitOne(SBTimeout);
+                _eventHandle1.WaitOne(SBTimeout);
+                _eventHandle2.WaitOne(SBTimeout);
 
                 // ensure all logs have had a chance to flush
                 await Task.Delay(4000);
@@ -247,16 +308,16 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
                     $"{jobContainerType.FullName}.SBTopicListener2",
                     $"{jobContainerType.FullName}.ServiceBusBinderTest",
                     "Job host started",
-                    $"Executing '{jobContainerType.Name}.SBQueue2SBQueue' (Reason='New ServiceBus message detected on '{FirstQueueName}'.', Id=",
+                    $"Executing '{jobContainerType.Name}.SBQueue2SBQueue' (Reason='', Id=",
                     $"Executed '{jobContainerType.Name}.SBQueue2SBQueue' (Succeeded, Id=",
                     $"Trigger Details:",
-                    $"Executing '{jobContainerType.Name}.SBQueue2SBTopic' (Reason='New ServiceBus message detected on '{SecondQueueName}'.', Id=",
+                    $"Executing '{jobContainerType.Name}.SBQueue2SBTopic' (Reason='', Id=",
                     $"Executed '{jobContainerType.Name}.SBQueue2SBTopic' (Succeeded, Id=",
                     $"Trigger Details:",
-                    $"Executing '{jobContainerType.Name}.SBTopicListener1' (Reason='New ServiceBus message detected on '{EntityNameHelper.FormatSubscriptionPath(TopicName, TopicSubscriptionName1)}'.', Id=",
+                    $"Executing '{jobContainerType.Name}.SBTopicListener1' (Reason='', Id=",
                     $"Executed '{jobContainerType.Name}.SBTopicListener1' (Succeeded, Id=",
                     $"Trigger Details:",
-                    $"Executing '{jobContainerType.Name}.SBTopicListener2' (Reason='New ServiceBus message detected on '{EntityNameHelper.FormatSubscriptionPath(TopicName, TopicSubscriptionName2)}'.', Id=",
+                    $"Executing '{jobContainerType.Name}.SBTopicListener2' (Reason='', Id=",
                     $"Executed '{jobContainerType.Name}.SBTopicListener2' (Succeeded, Id=",
                     $"Trigger Details:",
                     "Job host stopped",
@@ -281,6 +342,17 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
                     "      \"MaxAutoRenewDuration\": \"00:05:00\",",
                     "      \"MaxConcurrentCalls\": 16",
                     "  }",
+                    "  \"SessionHandlerOptions\": {",
+                    "      \"MaxAutoRenewDuration\": \"00:05:00\",",
+                    "      \"MessageWaitTimeout\": \"00:01:00\",",
+                    "      \"MaxConcurrentSessions\": 2000",
+                    "      \"AutoComplete\": true",
+                    "  }",
+                    "  \"BatchOptions\": {",
+                    "      \"MaxMessageCount\": 100,",
+                    "      \"OperationTimeout\": \"00:00:05\",",
+                    "      \"DelayBetweenOperations\": \"00:00:02\"",
+                    "  }",
                     "}",
                     "SingletonOptions",
                     "{",
@@ -292,7 +364,13 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
                     "}",
                 }.OrderBy(p => p).ToArray();
 
-                Action<string>[] inspectors = expectedOutputLines.Select<string, Action<string>>(p => (string m) => m.StartsWith(p)).ToArray();
+                expectedOutputLines = expectedOutputLines.Select(x => x.Replace(" ", string.Empty)).ToArray();
+                consoleOutputLines = consoleOutputLines.Select(x => x.Replace(" ", string.Empty)).ToArray();
+
+                Action<string>[] inspectors = expectedOutputLines.Select<string, Action<string>>(p => (string m) =>
+                {
+                     Assert.True(p.StartsWith(m) || m.StartsWith(p));
+                }).ToArray();
                 Assert.Collection(consoleOutputLines, inspectors);
 
                 // Verify that trigger details are properly formatted
@@ -312,6 +390,20 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
         {
             QueueClient queueClient = new QueueClient(connectionString, queueName);
             await queueClient.SendAsync(new Message(Encoding.UTF8.GetBytes(message)));
+            await queueClient.CloseAsync();
+        }
+
+        private async Task WriteQueueMessage(string connectionString, string queueName, DummyClass obj)
+        {
+            byte[] bytes;
+            using (MemoryStream ms = new MemoryStream())
+            {
+                DataContractBinarySerializer<DummyClass>.Instance.WriteObject(ms, obj);
+                bytes = ms.ToArray();
+            }
+
+            QueueClient queueClient = new QueueClient(connectionString, queueName);
+            await queueClient.SendAsync(new Message(bytes));
             await queueClient.CloseAsync();
         }
 
@@ -340,7 +432,7 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
             protected static void SBTopicListener1Impl(string input)
             {
                 _resultMessage1 = input + "-topic-1";
-                _topicSubscriptionCalled1.Set();
+                _eventHandle1.Set();
             }
 
             protected static void SBTopicListener2Impl(Message message)
@@ -351,7 +443,7 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
                     _resultMessage2 = reader.ReadToEnd() + "-topic-2";
                 }
 
-                _topicSubscriptionCalled2.Set();
+                _eventHandle2.Set();
             }
         }
 
@@ -374,7 +466,7 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
                 await messageSender.SendAsync(message);
             }
 
-            // Passes a service bus message from a queue to topic using a brokered message
+            // Passes a service bus message from a queue to topic using a brokered message 
             public static void SBQueue2SBTopic(
                 [ServiceBusTrigger(SecondQueueName)] string message,
                 [ServiceBus(TopicName)] out Message output)
@@ -416,10 +508,157 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
                 int numMessages,
                 Binder binder)
             {
-                var attribute = new ServiceBusAttribute(BinderQueueName)
+                var attribute = new ServiceBusAttribute(BinderQueueName);
+
+                var collector = await binder.BindAsync<IAsyncCollector<string>>(attribute);
+
+                for (int i = 0; i < numMessages; i++)
                 {
-                    EntityType = EntityType.Queue
-                };
+                    await collector.AddAsync(message + i);
+                }
+
+                await collector.FlushAsync();
+            }
+        }
+
+        public class ServiceBusMultipleTestJobsBase
+        {
+            protected static bool firstReceived = false;
+            protected static bool secondReceived = false;
+
+            public static void ProcessMessages(string[] messages)
+            {
+                if (messages.Contains("{'Name': 'Test1', 'Value': 'Value'}"))
+                {
+                    firstReceived = true;
+                }
+                if (messages.Contains("{'Name': 'Test2', 'Value': 'Value'}"))
+                {
+                    secondReceived = true;
+                }
+
+                if (firstReceived && secondReceived)
+                {
+                    _eventHandle1.Set();
+                }
+            }
+        }
+
+        public class ServiceBusMultipleMessagesTestJobs1 : ServiceBusTestJobsBase
+        {
+
+            public static void SBQueue2SBQueue(
+                [ServiceBusTrigger(FirstQueueName)] string[] messages,
+                MessageReceiver messageReceiver)
+            {
+                if (messages.Length != 2)
+                {
+                }
+                Assert.Equal(FirstQueueName, messageReceiver.Path);
+                ServiceBusMultipleTestJobsBase.ProcessMessages(messages);
+            }
+        }
+
+        public class ServiceBusMultipleMessagesTestJobs2 : ServiceBusTestJobsBase
+        {
+
+            public static void SBQueue2SBQueue(
+                [ServiceBusTrigger(FirstQueueName)] Message[] array,
+                MessageReceiver messageReceiver)
+            {
+                Assert.Equal(FirstQueueName, messageReceiver.Path);
+                string[] messages = array.Select(x =>
+                {
+                    using (Stream stream = new MemoryStream(x.Body))
+                    using (TextReader reader = new StreamReader(stream))
+                    {
+                        return reader.ReadToEnd();
+                    }
+                }).ToArray();
+                ServiceBusMultipleTestJobsBase.ProcessMessages(messages);
+            }
+        }
+
+        public class ServiceBusMultipleMessagesTestJobs3 : ServiceBusTestJobsBase
+        {
+            public static void SBQueue2SBQueue(
+                [ServiceBusTrigger(FirstQueueName)] DummyClass[] array,
+                MessageReceiver messageReceiver)
+            {
+                Assert.Equal(FirstQueueName, messageReceiver.Path);
+                string[] messages = array.Select(x => "{'Name': '" + x.Name + "', 'Value': 'Value'}").ToArray();
+                ServiceBusMultipleTestJobsBase.ProcessMessages(messages);
+            }
+        }
+
+        public class DummyClass
+        {
+            public string Name { get; set; }
+            public string Value { get; set; }
+        }
+
+        public class ServiceBusTestJobsEntityPath : ServiceBusTestJobsBase
+        {
+            public static async Task SBQueue2SBQueue(
+                [ServiceBusTrigger(Connection = ServiceBusQueue1EntityPath)] string start, int deliveryCount,
+                MessageReceiver messageReceiver,
+                string lockToken,
+                [ServiceBus(Connection = ServiceBusQueue2EntityPath)] MessageSender messageSender)
+            {
+                Assert.Equal(FirstQueueName, messageReceiver.Path);
+                Assert.Equal(1, deliveryCount);
+
+                // verify the message receiver and token are valid
+                await messageReceiver.RenewLockAsync(lockToken);
+
+                var message = SBQueue2SBQueue_GetOutputMessage(start);
+                await messageSender.SendAsync(message);
+            }
+
+            // Passes a service bus message from a queue to topic using a brokered message 
+            public static void SBQueue2SBTopic(
+                [ServiceBusTrigger(Connection = ServiceBusQueue2EntityPath)] string message,
+                [ServiceBus(Connection = ServiceBusTopic1OutputEntityPath)] out Message output)
+            {
+                output = SBQueue2SBTopic_GetOutputMessage(message);
+            }
+
+            // First listener for the topic
+            public static void SBTopicListener1(
+                [ServiceBusTrigger(Connection = ServiceBusTopic1TriggerEntityPath)] string message,
+                MessageReceiver messageReceiver,
+                string lockToken)
+            {
+                SBTopicListener1Impl(message);
+            }
+
+            // Second listener for the topic
+            // Just sprinkling Singleton here because previously we had a bug where this didn't work
+            // for ServiceBus.
+            [Singleton]
+            public static void SBTopicListener2(
+                [ServiceBusTrigger(TopicName, TopicSubscriptionName2)] Message message)
+            {
+                SBTopicListener2Impl(message);
+            }
+
+            // Demonstrate triggering on a queue in one account, and writing to a topic
+            // in the primary subscription
+            public static void MultipleAccounts(
+                [ServiceBusTrigger(FirstQueueName, Connection = SecondaryConnectionStringKey)] string input,
+                [ServiceBus(TopicName)] out string output)
+            {
+                output = input;
+            }
+
+            [NoAutomaticTrigger]
+            public static async Task ServiceBusBinderTest(
+                string message,
+                int numMessages,
+                Binder binder)
+            {
+                var attribute = new ServiceBusAttribute(BinderQueueName);
+
                 var collector = await binder.BindAsync<IAsyncCollector<string>>(attribute);
 
                 for (int i = 0; i < numMessages; i++)

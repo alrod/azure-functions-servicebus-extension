@@ -180,7 +180,13 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
             await TestMultiple<ServiceBusMultipleMessagesTestJobs3>();
         }
 
-        private async Task TestMultiple<T>()
+        //[Fact]
+        //public async Task TestBatch_XmlPoco()
+        //{
+        //    await TestMultiple<ServiceBusMultipleMessagesTestJobs3>(true);
+        //}
+
+        private async Task TestMultiple<T>(bool isXml = false)
         {
             IHost host = new HostBuilder()
                .ConfigureDefaultTestHost<T>(b =>
@@ -189,14 +195,16 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
                }, nameResolver: _nameResolver)
                .Build();
 
-            await WriteQueueMessage(_primaryConnectionString, FirstQueueName, "{'Name': 'Test1', 'Value': 'Value'}");
-            await WriteQueueMessage(_primaryConnectionString, FirstQueueName, "{'Name': 'Test2', 'Value': 'Value'}");
-
-            //await WriteQueueMessage(_primaryConnectionString, FirstQueueName, new DummyClass() { Name = "Test1" });
-            //await WriteQueueMessage(_primaryConnectionString, FirstQueueName, new DummyClass() { Name = "Test2" });
-
-            // ensure all messages are in place
-            // await Task.Delay(10000);
+            if (isXml)
+            {
+                await WriteQueueMessage(_primaryConnectionString, FirstQueueName, new DummyClass() { Name = "Test1" });
+                await WriteQueueMessage(_primaryConnectionString, FirstQueueName, new DummyClass() { Name = "Test2" });
+            }
+            else
+            {
+                await WriteQueueMessage(_primaryConnectionString, FirstQueueName, "{'Name': 'Test1', 'Value': 'Value'}");
+                await WriteQueueMessage(_primaryConnectionString, FirstQueueName, "{'Name': 'Test2', 'Value': 'Value'}");
+            }
 
             _eventHandle1 = new ManualResetEvent(initialState: false);
 
@@ -204,9 +212,6 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
 
             bool result = _eventHandle1.WaitOne(SBTimeout);
             Assert.True(result);
-
-            // ensure all logs have had a chance to flush
-            await Task.Delay(3000);
 
             // Wait for the host to terminate
             await host.StopAsync();
@@ -398,18 +403,22 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
             await queueClient.CloseAsync();
         }
 
-        //private async Task WriteQueueMessage(string connectionString, string queueName, DummyClass obj)
-        //{
-        //    var serializer = new Microsoft.Azure.ServiceBus.InteropExtensions.DataContractBinarySerializer(typeof(DummyClass));
-        //    byte[] payload = null;
-        //    using (var memoryStream = new MemoryStream(10))
-        //    {
-        //        serializer.WriteObject(memoryStream, obj);
-        //        memoryStream.Flush();
-        //        memoryStream.Position = 0;
-        //        payload = memoryStream.ToArray();
-        //    }
-        //}
+        private async Task WriteQueueMessage(string connectionString, string queueName, DummyClass obj)
+        {
+            var serializer = new DataContractSerializer(typeof(DummyClass));
+            byte[] payload = null;
+            using (var memoryStream = new MemoryStream(10))
+            {
+                serializer.WriteObject(memoryStream, obj);
+                memoryStream.Flush();
+                memoryStream.Position = 0;
+                payload = memoryStream.ToArray();
+            }
+
+            QueueClient queueClient = new QueueClient(connectionString, queueName);
+            await queueClient.SendAsync(new Message(payload));
+            await queueClient.CloseAsync();
+        }
 
         public abstract class ServiceBusTestJobsBase
         {

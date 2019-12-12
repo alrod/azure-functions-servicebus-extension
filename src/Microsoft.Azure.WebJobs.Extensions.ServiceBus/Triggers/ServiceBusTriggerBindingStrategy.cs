@@ -11,7 +11,7 @@ using Microsoft.Azure.WebJobs.Host.Triggers;
 
 namespace Microsoft.Azure.WebJobs.ServiceBus
 {
-    // Binding strategy for an service bus triggers.
+    // Binding strategy for a service bus triggers.
     internal class ServiceBusTriggerBindingStrategy : ITriggerBindingStrategy<Message, ServiceBusTriggerInput>
     {
         public ServiceBusTriggerInput ConvertFromString(string input)
@@ -20,7 +20,7 @@ namespace Microsoft.Azure.WebJobs.ServiceBus
             Message message = new Message(bytes);
 
             // Return a single message. Doesn't support multiple dispatch
-            return ServiceBusTriggerInput.New(message);
+            return ServiceBusTriggerInput.CreateSingle(message);
         }
 
         // Single instance: Core --> Message
@@ -31,7 +31,7 @@ namespace Microsoft.Azure.WebJobs.ServiceBus
                 throw new ArgumentNullException("value");
             }
 
-            return value.GetSingleMessage();
+            return value.Messages[0];
         }
 
         public Message[] BindMultiple(ServiceBusTriggerInput value, ValueBindingContext context)
@@ -52,12 +52,12 @@ namespace Microsoft.Azure.WebJobs.ServiceBus
             }
 
             var bindingData = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-            SafeAddValue(() => bindingData.Add(nameof(value.MessageReceiver), value.MessageReceiver));
-            SafeAddValue(() => bindingData.Add(nameof(value.MessageSession), value.MessageSession));
+            SafeAddValue(() => bindingData.Add(nameof(value.MessageReceiver), value.MessageReceiver as MessageReceiver));
+            SafeAddValue(() => bindingData.Add("MessageSession", value.MessageReceiver as IMessageSession));
 
             if (value.IsSingleDispatch)
             {
-                AddBindingData(bindingData, value.GetSingleMessage());
+                AddBindingData(bindingData, value.Messages[0]);
             }
             else
             {

@@ -162,13 +162,13 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
         }
 
         [Fact]
-        public async Task TestBatch_DataContractPoco()
+        public async Task TestBatch_JsonPoco()
         {
             await TestMultiple<ServiceBusMultipleMessagesTestJobs3>();
         }
 
         [Fact]
-        public async Task TestBatch_XmlPoco()
+        public async Task TestBatch_DataContractPoco()
         {
             await TestMultiple<ServiceBusMultipleMessagesTestJobs3>(true);
         }

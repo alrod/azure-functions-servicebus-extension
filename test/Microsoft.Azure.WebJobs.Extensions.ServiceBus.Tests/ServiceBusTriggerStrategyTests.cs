@@ -67,14 +67,14 @@ namespace Microsoft.Azure.WebJobs.ServiceBus.UnitTests
             userProps.Add(new KeyValuePair<string, object>("prop2", "value2"));
             TestHelpers.SetField(message, "UserProperties", userProps);
 
-            var input = ServiceBusTriggerInput.New(message);
+            var input = ServiceBusTriggerInput.CreateSingle(message);
             var strategy = new ServiceBusTriggerBindingStrategy();
             var bindingData = strategy.GetBindingData(input);
 
             Assert.Equal(15, bindingData.Count);  // SystemPropertiesCollection is sealed 
 
-            Assert.Same(input.MessageReceiver, bindingData["MessageReceiver"]);
-            Assert.Same(input.MessageSession, bindingData["MessageSession"]);
+            Assert.Same(input.MessageReceiver as MessageReceiver, bindingData["MessageReceiver"]);
+            Assert.Same(input.MessageReceiver as IMessageSession, bindingData["MessageSession"]);
             Assert.Equal(message.SystemProperties.LockToken, bindingData["LockToken"]);
             Assert.Equal(message.SystemProperties.SequenceNumber, bindingData["SequenceNumber"]);
             Assert.Equal(message.SystemProperties.DeliveryCount, bindingData["DeliveryCount"]);
@@ -110,16 +110,13 @@ namespace Microsoft.Azure.WebJobs.ServiceBus.UnitTests
                 TestHelpers.SetField(message, "SystemProperties", sysProps);
             }
 
-            var input = new ServiceBusTriggerInput
-            {
-                Messages = messages
-            };
+            var input = ServiceBusTriggerInput.CreateBatch(messages);
             var strategy = new ServiceBusTriggerBindingStrategy();
             var bindingData = strategy.GetBindingData(input);
 
             Assert.Equal(15, bindingData.Count);
-            Assert.Same(input.MessageReceiver, bindingData["MessageReceiver"]);
-            Assert.Same(input.MessageSession, bindingData["MessageSession"]);
+            Assert.Same(input.MessageReceiver as MessageReceiver, bindingData["MessageReceiver"]);
+            Assert.Same(input.MessageReceiver as IMessageSession, bindingData["MessageSession"]);
 
             // verify an array was created for each binding data type
             Assert.Equal(messages.Length, ((int[])bindingData["DeliveryCountArray"]).Length);

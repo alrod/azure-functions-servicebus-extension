@@ -86,9 +86,6 @@ namespace Microsoft.Azure.WebJobs.ServiceBus.Listeners
                 throw new InvalidOperationException("The listener has already been started.");
             }
 
-
-
-
             if (_singleDispatch)
             {
                 if (_isSessionsEnabled)
@@ -184,7 +181,9 @@ namespace Microsoft.Azure.WebJobs.ServiceBus.Listeners
 
         internal async Task ProcessMessageAsync(Message message, CancellationToken cancellationToken)
         {
-            if (!await _messageProcessor.BeginProcessingMessageAsync(message, cancellationToken))
+            CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cancellationTokenSource.Token);
+
+            if (!await _messageProcessor.BeginProcessingMessageAsync(message, linkedCts.Token))
             {
                 return;
             }
@@ -193,14 +192,16 @@ namespace Microsoft.Azure.WebJobs.ServiceBus.Listeners
             input.MessageReceiver = Receiver;
 
             TriggeredFunctionData data = input.GetTriggerFunctionData();
-            FunctionResult result = await _triggerExecutor.TryExecuteAsync(data, cancellationToken);
-            await _messageProcessor.CompleteProcessingMessageAsync(message, result, cancellationToken);
+            FunctionResult result = await _triggerExecutor.TryExecuteAsync(data, linkedCts.Token);
+            await _messageProcessor.CompleteProcessingMessageAsync(message, result, linkedCts.Token);
         }
 
         internal async Task ProcessSessionMessageAsync(IMessageSession session, Message message, CancellationToken cancellationToken)
         {
+            CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cancellationTokenSource.Token);
+
             _messageSession = session;
-            if (!await _sessionMessageProcessor.BeginProcessingMessageAsync(session, message, cancellationToken))
+            if (!await _sessionMessageProcessor.BeginProcessingMessageAsync(session, message, linkedCts.Token))
             {
                 return;
             }
@@ -209,8 +210,8 @@ namespace Microsoft.Azure.WebJobs.ServiceBus.Listeners
             input.MessageReceiver = session;
 
             TriggeredFunctionData data = input.GetTriggerFunctionData();
-            FunctionResult result = await _triggerExecutor.TryExecuteAsync(data, cancellationToken);
-            await _sessionMessageProcessor.CompleteProcessingMessageAsync(session, message, result, cancellationToken);
+            FunctionResult result = await _triggerExecutor.TryExecuteAsync(data, linkedCts.Token);
+            await _sessionMessageProcessor.CompleteProcessingMessageAsync(session, message, result, linkedCts.Token);
         }
 
         internal void StartMessageBatchReceiver(CancellationToken cancellationToken)

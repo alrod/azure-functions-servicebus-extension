@@ -152,25 +152,25 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
         [Fact]
         public async Task TestBatch_String()
         {
-            await TestMultiple<ServiceBusMultipleMessagesTestJobs1>();
+            await TestMultiple<ServiceBusMultipleMessagesTestJob_BindToStringArray>();
         }
 
         [Fact]
         public async Task TestBatch_Messages()
         {
-            await TestMultiple<ServiceBusMultipleMessagesTestJobs2>();
+            await TestMultiple<ServiceBusMultipleMessagesTestJob_BindToMessageArray>();
         }
 
         [Fact]
         public async Task TestBatch_JsonPoco()
         {
-            await TestMultiple<ServiceBusMultipleMessagesTestJobs3>();
+            await TestMultiple<ServiceBusMultipleMessagesTestJob_BindToPocoArray>();
         }
 
         [Fact]
         public async Task TestBatch_DataContractPoco()
         {
-            await TestMultiple<ServiceBusMultipleMessagesTestJobs3>(true);
+            await TestMultiple<ServiceBusMultipleMessagesTestJob_BindToPocoArray>(true);
         }
 
         private async Task TestMultiple<T>(bool isXml = false)
@@ -184,8 +184,8 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
 
             if (isXml)
             {
-                await WriteQueueMessage(_primaryConnectionString, FirstQueueName, new DummyClass() { Name = "Test1", Value = "Value" });
-                await WriteQueueMessage(_primaryConnectionString, FirstQueueName, new DummyClass() { Name = "Test2", Value = "Value" });
+                await WriteQueueMessage(_primaryConnectionString, FirstQueueName, new TestPoco() { Name = "Test1", Value = "Value" });
+                await WriteQueueMessage(_primaryConnectionString, FirstQueueName, new TestPoco() { Name = "Test2", Value = "Value" });
             }
             else
             {
@@ -353,6 +353,7 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
                     "  \"BatchOptions\": {",
                     "      \"MaxMessageCount\": 1000,",
                     "      \"OperationTimeout\": \"00:01:00\",",
+                    "      \"AutoComplete\": true",
                     "  }",
                     "SingletonOptions",
                     "{",
@@ -398,9 +399,9 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
             await queueClient.CloseAsync();
         }
 
-        public static async Task WriteQueueMessage(string connectionString, string queueName, DummyClass obj, string sessionId = null)
+        public static async Task WriteQueueMessage(string connectionString, string queueName, TestPoco obj, string sessionId = null)
         {
-            var serializer = new DataContractSerializer(typeof(DummyClass));
+            var serializer = new DataContractSerializer(typeof(TestPoco));
             byte[] payload = null;
             using (var memoryStream = new MemoryStream(10))
             {
@@ -574,7 +575,7 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
             }
         }
 
-        public class ServiceBusMultipleMessagesTestJobs1 
+        public class ServiceBusMultipleMessagesTestJob_BindToStringArray 
         {
 
             public static async Task SBQueue2SBQueue(
@@ -593,7 +594,7 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
             }
         }
 
-        public class ServiceBusMultipleMessagesTestJobs2 
+        public class ServiceBusMultipleMessagesTestJob_BindToMessageArray 
         {
 
             public static void SBQueue2SBQueue(
@@ -613,10 +614,10 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
             }
         }
 
-        public class ServiceBusMultipleMessagesTestJobs3
+        public class ServiceBusMultipleMessagesTestJob_BindToPocoArray
         {
             public static void SBQueue2SBQueue(
-                [ServiceBusTrigger(FirstQueueName)] DummyClass[] array,
+                [ServiceBusTrigger(FirstQueueName)] TestPoco[] array,
                 MessageReceiver messageReceiver)
             {
                 Assert.Equal(FirstQueueName, messageReceiver.Path);
@@ -686,7 +687,7 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
         }
     }
 
-    public class DummyClass
+    public class TestPoco
     {
         public string Name { get; set; }
         public string Value { get; set; }

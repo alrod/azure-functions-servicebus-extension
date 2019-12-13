@@ -267,7 +267,7 @@ namespace Microsoft.Azure.WebJobs.ServiceBus.Listeners
                             }
 
                             // Complete batch of messages only if the execution was successful
-                            if (_started)
+                            if (_serviceBusOptions.BatchOptions.AutoComplete && _started)
                             {
                                 if (result.Succeeded)
                                 {

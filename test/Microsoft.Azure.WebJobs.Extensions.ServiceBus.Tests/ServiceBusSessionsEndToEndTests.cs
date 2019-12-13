@@ -323,25 +323,25 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
         [Fact]
         public async Task TestBatch_String()
         {
-            await TestMultiple<ServiceBusMultipleMessagesTestJobs1>();
+            await TestMultiple<ServiceBusMultipleMessagesTestJob_BindToStringArray>();
         }
 
         [Fact]
         public async Task TestBatch_Messages()
         {
-            await TestMultiple<ServiceBusMultipleMessagesTestJobs2>();
+            await TestMultiple<ServiceBusMultipleMessagesTestJob_BindToMessageArray>();
         }
 
         [Fact]
         public async Task TestBatch_JsonPoco()
         {
-            await TestMultiple<ServiceBusMultipleMessagesTestJobs3>();
+            await TestMultiple<ServiceBusMultipleMessagesTestJob_BindToPocoArray>();
         }
 
         [Fact]
         public async Task TestBatch_DataContractPoco()
         {
-            await TestMultiple<ServiceBusMultipleMessagesTestJobs3>(true);
+            await TestMultiple<ServiceBusMultipleMessagesTestJob_BindToPocoArray>(true);
         }
 
         private async Task TestMultiple<T>(bool isXml = false)
@@ -355,8 +355,8 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
 
             if (isXml)
             {
-                await ServiceBusEndToEndTests.WriteQueueMessage(_connectionString, _queueName, new DummyClass() { Name = "Test1" }, "sessionId");
-                await ServiceBusEndToEndTests.WriteQueueMessage(_connectionString, _queueName, new DummyClass() { Name = "Test2" }, "sessionId");
+                await ServiceBusEndToEndTests.WriteQueueMessage(_connectionString, _queueName, new TestPoco() { Name = "Test1" }, "sessionId");
+                await ServiceBusEndToEndTests.WriteQueueMessage(_connectionString, _queueName, new TestPoco() { Name = "Test2" }, "sessionId");
             }
             else
             {
@@ -458,7 +458,7 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
             }
         }
 
-        public class ServiceBusMultipleMessagesTestJobs1
+        public class ServiceBusMultipleMessagesTestJob_BindToStringArray
         {
 
             public static async Task SBQueue2SBQueue(
@@ -477,7 +477,7 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
             }
         }
 
-        public class ServiceBusMultipleMessagesTestJobs2
+        public class ServiceBusMultipleMessagesTestJob_BindToMessageArray
         {
 
             public static void SBQueue2SBQueue(
@@ -497,10 +497,10 @@ namespace Microsoft.Azure.WebJobs.Host.EndToEndTests
             }
         }
 
-        public class ServiceBusMultipleMessagesTestJobs3
+        public class ServiceBusMultipleMessagesTestJob_BindToPocoArray
         {
             public static void SBQueue2SBQueue(
-                [ServiceBusTrigger(_queueName, IsSessionsEnabled = true)] DummyClass[] array,
+                [ServiceBusTrigger(_queueName, IsSessionsEnabled = true)] TestPoco[] array,
                 IMessageSession messageSession)
             {
                 Assert.Equal(_queueName, messageSession.Path);

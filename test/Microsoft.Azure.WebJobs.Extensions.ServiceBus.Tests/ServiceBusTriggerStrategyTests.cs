@@ -134,6 +134,24 @@ namespace Microsoft.Azure.WebJobs.ServiceBus.UnitTests
             Assert.Equal(messages.Length, ((IDictionary<string, object>[])bindingData["UserPropertiesArray"]).Length);
         }
 
+        [Fact]
+        public void BindSingle_Returns_Exptected_Message()
+        {
+            string data = "123";
+
+            var strategy = new ServiceBusTriggerBindingStrategy();
+            ServiceBusTriggerInput triggerInput = strategy.ConvertFromString(data);
+
+            var contract = strategy.GetBindingData(triggerInput);
+
+            Message single = strategy.BindSingle(triggerInput, null);
+            string body = Encoding.UTF8.GetString(single.Body);
+
+            Assert.Equal(data, body);
+            Assert.Null(contract["MessageReceiver"]);
+            Assert.Null(contract["MessageSession"]);
+        }
+
         private static void CheckBindingContract(Dictionary<string, Type> bindingDataContract)
         {
             Assert.Equal(15, bindingDataContract.Count);
@@ -164,24 +182,6 @@ namespace Microsoft.Azure.WebJobs.ServiceBus.UnitTests
             TestHelpers.SetField(sysProps, "lockTokenGuid", Guid.NewGuid());
             TestHelpers.SetField(sysProps, "deadLetterSource", "test");
             return sysProps;
-        }
-
-        [Fact]
-        public void TriggerStrategy()
-        {
-            string data = "123";
-
-            var strategy = new ServiceBusTriggerBindingStrategy();
-            ServiceBusTriggerInput triggerInput = strategy.ConvertFromString(data);
-
-            var contract = strategy.GetBindingData(triggerInput);
-
-            Message single = strategy.BindSingle(triggerInput, null);
-            string body = Encoding.UTF8.GetString(single.Body);
-
-            Assert.Equal(data, body);
-            Assert.Null(contract["MessageReceiver"]);
-            Assert.Null(contract["MessageSession"]);
         }
     }
 }

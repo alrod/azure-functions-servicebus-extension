@@ -36,6 +36,7 @@ namespace Microsoft.Azure.WebJobs.ServiceBus
             {
                 MaxMessageCount = 1000,
                 OperationTimeout = TimeSpan.FromMinutes(1),
+                AutoComplete = true
             };
         }
 
@@ -101,6 +102,7 @@ namespace Microsoft.Azure.WebJobs.ServiceBus
                 {
                     { nameof(BatchOptions.MaxMessageCount), BatchOptions.MaxMessageCount },
                     { nameof(BatchOptions.OperationTimeout), BatchOptions.OperationTimeout },
+                    { nameof(BatchOptions.AutoComplete), BatchOptions.AutoComplete },
                 };
             }
 

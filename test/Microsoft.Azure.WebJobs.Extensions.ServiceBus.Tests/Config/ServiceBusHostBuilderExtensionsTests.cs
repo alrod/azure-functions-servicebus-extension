@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Azure.ServiceBus;
 using Microsoft.Azure.WebJobs.Host;
 using Microsoft.Azure.WebJobs.Host.Config;
 using Microsoft.Azure.WebJobs.Host.TestCommon;
@@ -127,6 +128,28 @@ namespace Microsoft.Azure.WebJobs.ServiceBus.UnitTests.Config
             }, new Dictionary<string, string>());
 
             Assert.Equal(options.ConnectionString, expectedValue);
+        }
+
+        [Fact]
+        public void AddServiceBus_NoServiceBusOptions_PerformsExpectedRegistration1()
+        {
+            IHost host = new HostBuilder()
+                .ConfigureDefaultTestHost(b =>
+                {
+                    b.AddServiceBus();
+                })
+                .Build();
+
+            // verify that the service bus config provider was registered
+            var extensions = host.Services.GetService<IExtensionRegistry>();
+            IExtensionConfigProvider[] configProviders = extensions.GetExtensions<IExtensionConfigProvider>().ToArray();
+
+            // verify that the service bus config provider was registered
+            var serviceBusExtensionConfig = configProviders.OfType<ServiceBusExtensionConfigProvider>().Single();
+            serviceBusExtensionConfig.Initialize()
+
+            var converterManager = host.Services.GetService<IConverterManager>();
+            var converter = converterManager.GetConverter<ServiceBusTriggerAttribute>(typeof(Message), typeof(string));
         }
     }
 }

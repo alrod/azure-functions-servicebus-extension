@@ -76,13 +76,12 @@ namespace Microsoft.Azure.WebJobs.ServiceBus.UnitTests.Listeners
             typeof(Message).GetProperty("SystemProperties").SetValue(message, systemProperties);
 
             message.MessageId = Guid.NewGuid().ToString();
-            CancellationToken cancellationToken = new CancellationToken();
-            _mockMessageProcessor.Setup(p => p.BeginProcessingMessageAsync(message, cancellationToken)).ReturnsAsync(true);
+            _mockMessageProcessor.Setup(p => p.BeginProcessingMessageAsync(message, It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
             FunctionResult result = new FunctionResult(true);
-            _mockExecutor.Setup(p => p.TryExecuteAsync(It.Is<TriggeredFunctionData>(q => (q.TriggerValue as ServiceBusTriggerInput).Messages[0] == message), cancellationToken)).ReturnsAsync(result);
+            _mockExecutor.Setup(p => p.TryExecuteAsync(It.Is<TriggeredFunctionData>(q => ((ServiceBusTriggerInput)q.TriggerValue).Messages[0] == message), It.IsAny<CancellationToken>())).ReturnsAsync(result);
 
-            _mockMessageProcessor.Setup(p => p.CompleteProcessingMessageAsync(message, result, cancellationToken)).Returns(Task.FromResult(0));
+            _mockMessageProcessor.Setup(p => p.CompleteProcessingMessageAsync(message, result, It.IsAny<CancellationToken>())).Returns(Task.FromResult(0));
 
             await _listener.ProcessMessageAsync(message, CancellationToken.None);
 
@@ -96,8 +95,8 @@ namespace Microsoft.Azure.WebJobs.ServiceBus.UnitTests.Listeners
         {
             var message = new CustomMessage();
             message.MessageId = Guid.NewGuid().ToString();
-            CancellationToken cancellationToken = new CancellationToken();
-            _mockMessageProcessor.Setup(p => p.BeginProcessingMessageAsync(message, cancellationToken)).ReturnsAsync(false);
+            //CancellationToken cancellationToken = new CancellationToken();
+            _mockMessageProcessor.Setup(p => p.BeginProcessingMessageAsync(message, It.IsAny<CancellationToken>())).ReturnsAsync(false);
 
             await _listener.ProcessMessageAsync(message, CancellationToken.None);
 

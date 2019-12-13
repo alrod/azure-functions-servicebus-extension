@@ -65,13 +65,13 @@ namespace Microsoft.Azure.WebJobs.ServiceBus
                         ParentId = parentId,
                         TriggerValue = this,
                         TriggerDetails = new Dictionary<string, string>()
-                {
-                    { "MessageId", message.MessageId },
-                    { "DeliveryCount", message.SystemProperties.DeliveryCount.ToString() },
-                    { "EnqueuedTimeUtc", message.SystemProperties.EnqueuedTimeUtc.ToString() },
-                    { "LockedUntilUtc", message.SystemProperties.LockedUntilUtc.ToString() },
-                    { "SessionId", message.SessionId }
-                }
+                        {
+                            { "MessageId", message.MessageId },
+                            { "DeliveryCount", message.SystemProperties.DeliveryCount.ToString() },
+                            { "EnqueuedTimeUtc", message.SystemProperties.EnqueuedTimeUtc.ToString() },
+                            { "LockedUntilUtc", message.SystemProperties.LockedUntilUtc.ToString() },
+                            { "SessionId", message.SessionId }
+                        }
                     };
                 }
                 else
@@ -99,13 +99,13 @@ namespace Microsoft.Azure.WebJobs.ServiceBus
                         ParentId = parentId,
                         TriggerValue = this,
                         TriggerDetails = new Dictionary<string, string>()
-                {
-                    { "MessageIdArray", string.Join(",", messageIds)},
-                    { "DeliveryCountArray", string.Join(",", deliveryCounts) },
-                    { "EnqueuedTimeUtcArray", string.Join(",", enqueuedTimes) },
-                    { "LockedUntilArray", string.Join(",", lockedUntils) },
-                    { "SessionId", sessionId }
-                }
+                        {
+                            { "MessageIdArray", string.Join(",", messageIds)},
+                            { "DeliveryCountArray", string.Join(",", deliveryCounts) },
+                            { "EnqueuedTimeUtcArray", string.Join(",", enqueuedTimes) },
+                            { "LockedUntilArray", string.Join(",", lockedUntils) },
+                            { "SessionId", sessionId }
+                        }
                     };
                 }
             }

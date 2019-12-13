@@ -18,5 +18,10 @@ namespace Microsoft.Azure.WebJobs.ServiceBus
         /// The time span the client waits for receiving a message before it times out.
         /// </summary>
         public TimeSpan OperationTimeout { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value that indicates whether the messages should be completed after successful processing. 
+        /// </summary>
+        public bool AutoComplete { get; set; }
     }
 }
